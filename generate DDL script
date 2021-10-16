@@ -1,0 +1,299 @@
+
+--SELECT GEN_ALL_DB_TABLE_DDL() FROM DUAL; 
+
+
+CREATE OR REPLACE FUNCTION GEN_ALL_DB_TABLE_DDL 
+RETURN CLOB 
+
+IS 
+
+OUT_DDL CLOB;   
+
+BEGIN 
+
+
+SELECT   'DECLARE'
+                  ||CHR(10)
+                  || 'L_EXTS NUMBER:=0;'
+                  ||CHR(10)
+                  || 'L_CONS NUMBER:=0;'
+                  ||CHR(10)
+                  || 'BEGIN'
+                  ||CHR(10)
+                  ||CHR(10)
+                  || CONCAT( XMLCAST( XMLAGG( XMLELEMENT(B, STR_LIST,'') ORDER BY ID ASC ) AS CLOB ) , CONCAT( CHR(10),'END;')) AS DDL 
+          INTO OUT_DDL 
+FROM     (
+                  SELECT   XMLCAST( XMLAGG( XMLELEMENT( B , 'BEGIN'
+                                    ||CHR(10)
+                                    || 'SELECT COUNT(*) INTO L_CONS'
+                                    ||CHR(10)
+                                    ||'FROM USER_CONSTRAINTS  WHERE UPPER(TABLE_NAME) ='
+                                    ||''''
+                                    ||UC.TABLE_NAME
+                                    ||''''
+                                    || ' AND UPPER(CONSTRAINT_NAME)='
+                                    ||''''
+                                    ||UC.CONSTRAINT_NAME
+                                    ||''''
+                                    ||';'
+                                    ||CHR(10)
+                                    ||'  IF ( L_CONS > 0 ) THEN '
+                                    ||CHR(10)
+                                    ||'      NULL;'
+                                    ||CHR(10)
+                                    ||'  ELSE'
+                                    ||CHR(10)
+                                    ||'         EXECUTE IMMEDIATE  '
+                                    ||''''
+                                    || 'ALTER TABLE '
+                                    ||UC.TABLE_NAME
+                                    || ' ADD CONSTRAINT '
+                                    || LISTAGG(UC.CONSTRAINT_NAME, CHR(13)) WITHIN GROUP (ORDER BY UC.CONSTRAINT_NAME)
+                                    || ' PRIMARY KEY ('
+                                    ||UCC.COLUMN_NAME
+                                    || ' )'
+                                    ||''''
+                                    ||';'
+                                    ||CHR(10)
+                                    ||' END IF; '
+                                    ||CHR(10)
+                                    ||'END;'
+                                    ||CHR(10)
+                                    ||'------------------------------------------------'
+                                    ||CHR(10)
+                                    ||'' ,' ') ORDER BY 1 ) AS CLOB ) STR_LIST ,
+                           1 AS  ID
+                  FROM     USER_CONSTRAINTS UC
+                  JOIN     USER_CONS_COLUMNS UCC
+                  ON       UC.CONSTRAINT_NAME = UCC.CONSTRAINT_NAME
+                  AND      UC.TABLE_NAME=UCC.TABLE_NAME
+                  WHERE    UC.CONSTRAINT_TYPE='P'
+                  AND      UC.TABLE_NAME NOT LIKE '%$%'
+                  GROUP BY UC.TABLE_NAME,
+                           UCC.COLUMN_NAME,
+                           UC.CONSTRAINT_NAME
+                  
+                  UNION ALL
+                  
+                  SELECT    XMLCAST( XMLAGG( XMLELEMENT( B , 'BEGIN'
+                                      ||CHR(10)
+                                      || 'SELECT COUNT(*) INTO L_CONS'
+                                      ||CHR(10)
+                                      ||'FROM USER_CONSTRAINTS  WHERE UPPER(TABLE_NAME) ='
+                                      ||''''
+                                      ||CONS.TABLE_NAME
+                                      ||''''
+                                      || ' AND UPPER(CONSTRAINT_NAME)='
+                                      ||''''
+                                      ||CONS.CONSTRAINT_NAME
+                                      ||''''
+                                      ||';'
+                                      ||CHR(10)
+                                      ||'  IF ( L_CONS > 0 ) THEN '
+                                      ||CHR(10)
+                                      ||'      NULL;'
+                                      ||CHR(10)
+                                      ||'  ELSE'
+                                      ||CHR(10)
+                                      ||'         EXECUTE IMMEDIATE  '
+                                      ||''''
+                                      || 'ALTER TABLE '
+                                      || CONS.TABLE_NAME
+                                      || ' ADD CONSTRAINT '
+                                      ||CONS.CONSTRAINT_NAME
+                                      ||' FOREIGN KEY ('
+                                      || COLS.COLUMN_NAME
+                                      ||') REFERENCES '
+                                      ||CONS_R.TABLE_NAME
+                                      ||' ('
+                                      ||COLS_R.COLUMN_NAME
+                                      ||')'';'
+                                      ||CHR(10)
+                                      ||' END IF; '
+                                      ||CHR(10)
+                                      ||'END;'
+                                      ||CHR(10)
+                                      ||'------------------------------------------------'
+                                      ||CHR(10)
+                                      ||'' ,'' ,'') ORDER BY 1 ) AS CLOB ) STR_LIST ,
+                            3 AS  ID
+                  FROM      USER_CONSTRAINTS CONS
+                  LEFT JOIN USER_CONS_COLUMNS COLS
+                  ON        COLS.CONSTRAINT_NAME = CONS.CONSTRAINT_NAME
+                  LEFT JOIN USER_CONSTRAINTS CONS_R
+                  ON        CONS_R.CONSTRAINT_NAME = CONS.R_CONSTRAINT_NAME
+                  LEFT JOIN USER_CONS_COLUMNS COLS_R
+                  ON        COLS_R.CONSTRAINT_NAME = CONS.R_CONSTRAINT_NAME
+                  WHERE     CONS.CONSTRAINT_TYPE = 'R'
+                  
+                  UNION ALL
+                  
+                  SELECT   XMLCAST( XMLAGG( XMLELEMENT( B , 'BEGIN'
+                                    ||CHR(10)
+                                    || 'SELECT COUNT(*) INTO L_CONS'
+                                    ||CHR(10)
+                                    ||'FROM USER_CONSTRAINTS  WHERE UPPER(TABLE_NAME) ='
+                                    ||''''
+                                    ||UC.TABLE_NAME
+                                    ||''''
+                                    || ' AND UPPER(CONSTRAINT_NAME)='
+                                    ||''''
+                                    ||UC.CONSTRAINT_NAME
+                                    ||''''
+                                    ||';'
+                                    ||CHR(10)
+                                    ||'  IF ( L_CONS > 0 ) THEN '
+                                    ||CHR(10)
+                                    ||'      NULL;'
+                                    ||CHR(10)
+                                    ||'  ELSE'
+                                    ||CHR(10)
+                                    ||'         EXECUTE IMMEDIATE  '
+                                    ||''''
+                                    || 'ALTER TABLE '
+                                    ||UC.TABLE_NAME
+                                    || ' ADD CONSTRAINT '
+                                    ||UC.CONSTRAINT_NAME
+                                    || ' UNIQUE ('
+                                    || LISTAGG(UCC.COLUMN_NAME, ',') WITHIN GROUP (ORDER BY 1)
+                                    ||')'
+                                    ||''''
+                                    ||';'
+                                    ||CHR(10)
+                                    ||' END IF; '
+                                    ||CHR(10)
+                                    ||'END;'
+                                    ||CHR(10)
+                                    ||'------------------------------------------------'
+                                    ||CHR(10)
+                                    ||'' ,' ') ORDER BY 1 ) AS CLOB ) STR_LIST ,
+                           2 AS ID
+                  FROM     USER_CONSTRAINTS UC
+                  JOIN     USER_CONS_COLUMNS UCC
+                  ON       UC.CONSTRAINT_NAME = UCC.CONSTRAINT_NAME
+                  AND      UC.TABLE_NAME=UCC.TABLE_NAME
+                  WHERE    UC.CONSTRAINT_TYPE='U'
+                  AND      UC.TABLE_NAME NOT LIKE '%$%'
+                  GROUP BY UC.TABLE_NAME,
+                           UC.CONSTRAINT_NAME
+                           
+                  UNION ALL
+                  
+                  SELECT   XMLCAST( XMLAGG( XMLELEMENT( B , 'BEGIN'
+                                    ||CHR(10)
+                                    || 'SELECT COUNT(*) INTO L_CONS'
+                                    ||CHR(10)
+                                    ||'FROM USER_CONSTRAINTS  WHERE UPPER(TABLE_NAME) ='
+                                    ||''''
+                                    ||UC.TABLE_NAME
+                                    ||''''
+                                    || ' AND UPPER(CONSTRAINT_NAME)='
+                                    ||''''
+                                    ||UC.CONSTRAINT_NAME
+                                    ||''''
+                                    ||';'
+                                    ||CHR(10)
+                                    ||'  IF ( L_CONS > 0 ) THEN '
+                                    ||CHR(10)
+                                    ||'      NULL;'
+                                    ||CHR(10)
+                                    ||'  ELSE'
+                                    ||CHR(10)
+                                    ||'         EXECUTE IMMEDIATE  '
+                                    ||''''
+                                    || 'ALTER TABLE '
+                                    ||UC.TABLE_NAME
+                                    || ' ADD CONSTRAINT '
+                                    ||UC.CONSTRAINT_NAME
+                                    || ' CHECK ('
+                                    ||UC.SEARCH_CONDITION_VC
+                                    ||' )'';'
+                                    ||CHR(10)
+                                    ||' END IF; '
+                                    ||CHR(10)
+                                    ||'END;'
+                                    ||CHR(10)
+                                    ||'------------------------------------------------'
+                                    ||CHR(10)
+                                    ||'' ,' ') ORDER BY 1 ) AS CLOB ) STR_LIST ,
+                           4 AS  ID
+                  FROM     USER_CONSTRAINTS UC
+                  JOIN     USER_CONS_COLUMNS UCC
+                  ON       UC.CONSTRAINT_NAME = UCC.CONSTRAINT_NAME
+                  AND      UC.TABLE_NAME=UCC.TABLE_NAME
+                  WHERE    UC.CONSTRAINT_TYPE='C'
+                  AND      UC.TABLE_NAME NOT LIKE '%$%'
+                  AND      UPPER(UC.CONSTRAINT_NAME) NOT LIKE 'SYS_%'
+                  
+                  UNION ALL
+                  
+                  SELECT   XMLCAST( XMLAGG( XMLELEMENT(B, STR_FINAL,'') ORDER BY TABLE_NAME ASC ) AS CLOB ) STR_LISTNEW2 ,
+                           0 AS   ID
+                  FROM     (
+                                    SELECT   TABLE_NAME,
+                                             'BEGIN'
+                                                      ||CHR(10)
+                                                      || 'SELECT COUNT(*) INTO L_EXTS'
+                                                      ||CHR(10)
+                                                      ||'FROM USER_OBJECTS  WHERE UPPER(OBJECT_TYPE) ='
+                                                      ||''''
+                                                      ||'TABLE'
+                                                      ||''''
+                                                      || ' AND UPPER(OBJECT_NAME)='
+                                                      ||''''
+                                                      ||TABLE_NAME
+                                                      ||''''
+                                                      ||';'
+                                                      ||CHR(10)
+                                                      ||'  IF ( L_EXTS > 0 ) THEN '
+                                                      ||CHR(10)
+                                                      ||'      NULL;'
+                                                      ||CHR(10)
+                                                      ||'  ELSE'
+                                                      ||CHR(10)
+                                                      ||'EXECUTE IMMEDIATE  '
+                                                      ||''''
+                                                      || 'CREATE TABLE '
+                                                      ||TABLE_NAME
+                                                      ||CHR(10)
+                                                      || ' ( '
+                                                      ||LISTAGG( DATA_TYPE
+                                                      ||NOT_NULL,' , ') WITHIN GROUP (ORDER BY COLUMN_ID)
+                                                      ||CHR(10)
+                                                      ||')'';'
+                                                      ||CHR(10)
+                                                      ||' END IF; '
+                                                      ||CHR(10)
+                                                      ||'END;'
+                                                      ||CHR(10)
+                                                      ||'------------------------------------------------'
+                                                      ||CHR(10)
+                                                      ||'' AS STR_FINAL
+                                    FROM     (
+                                                      SELECT   TABLE_NAME ,
+                                                               COLUMN_ID,
+                                                               CHR(10)
+                                                                        ||COLUMN_NAME
+                                                                        ||' '
+                                                                        ||
+                                                               CASE
+                                                                        WHEN DATA_TYPE LIKE 'TIMESTAMP%' THEN DATA_TYPE
+                                                                        WHEN DATA_TYPE LIKE 'BLOB' THEN DATA_TYPE
+                                                                        WHEN DATA_TYPE LIKE 'DATE' THEN DATA_TYPE
+                                                                        ELSE DATA_TYPE
+                                                                                          ||CONCAT(' ( ',CONCAT(DATA_LENGTH,' ) '))
+                                                               END AS DATA_TYPE,
+                                                               CASE
+                                                                        WHEN NULLABLE='N' THEN 'NOT NULL'
+                                                                        ELSE ''
+                                                               END AS NOT_NULL
+                                                      FROM     USER_TAB_COLUMNS
+                                                      ORDER BY COLUMN_ID )
+                                    GROUP BY TABLE_NAME ) );
+  RETURN OUT_DDL;
+  
+ EXCEPTION WHEN OTHERS THEN 
+    RAISE_APPLICATION_ERROR(-20001,SQLERRM||DBMS_UTILITY.FORMAT_ERROR_BACKTRACE);
+ END GEN_ALL_DB_TABLE_DDL;
+ 
