@@ -288,8 +288,9 @@ FROM     (
                                                                         WHEN NULLABLE='N' THEN 'NOT NULL'
                                                                         ELSE ''
                                                                END AS NOT_NULL
-                                                      FROM     USER_TAB_COLUMNS
-                                                      ORDER BY COLUMN_ID )
+                                                      from tab a inner join USER_TAB_COLUMNS b on a.tname=b.table_name 
+                                                      where a.tabtype ='TABLE' and a.tname not like '%$%'
+                                                      order by b.column_id )
                                     GROUP BY TABLE_NAME ) );
   RETURN OUT_DDL;
   
